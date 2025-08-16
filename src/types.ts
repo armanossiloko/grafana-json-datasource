@@ -12,6 +12,7 @@ export interface JsonField {
 export type Pair<T, K> = [T, K];
 
 export interface JsonApiQuery extends DataQuery {
+  refId: string;
   fields: JsonField[];
   method: string;
   urlPath: string;
@@ -20,6 +21,10 @@ export interface JsonApiQuery extends DataQuery {
   headers: Array<Pair<string, string>>;
   body: string;
   cacheDurationSeconds: number;
+
+  // Request type functionality
+  requestType?: string;
+  customBody?: Record<string, any>;
 
   // Keep for backwards compatibility with older version of variables query editor.
   jsonPath?: string;
@@ -39,6 +44,55 @@ export const defaultQuery: Partial<JsonApiQuery> = {
   fields: [{ jsonPath: '' }],
 };
 
+export interface RequestType {
+  id: string;
+  name: string;
+  description?: string;
+  basePath: string;
+  httpMethod: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  defaultFields?: JsonField[];
+  isHardcoded?: boolean;
+  api?: 'DomainService' | 'DataService';
+}
+
+export interface SeriesConfiguration {
+  $type:
+    | 'DataServiceSeriesConfiguration'
+    | 'MultiDataServiceSeriesConfiguration'
+    | 'NativeDataServiceSeriesConfiguration';
+  name: string;
+  color: string;
+}
+
+export interface DataServiceSeriesConfiguration extends SeriesConfiguration {
+  $type: 'DataServiceSeriesConfiguration';
+  dataformat: string;
+  selector: string;
+  interpolation: string;
+  aggregation: string;
+}
+
+export interface MultiDataServiceSeriesConfiguration extends SeriesConfiguration {
+  $type: 'MultiDataServiceSeriesConfiguration';
+  dataformat: string;
+  selector: string;
+  interpolation: string;
+  isParentAggregation: boolean;
+  streamAggregation: string;
+  seriesAggregation: string;
+}
+
+export interface NativeDataServiceSeriesConfiguration extends SeriesConfiguration {
+  $type: 'NativeDataServiceSeriesConfiguration';
+  query: string;
+}
+
+export type AnySeriesConfiguration =
+  | DataServiceSeriesConfiguration
+  | MultiDataServiceSeriesConfiguration
+  | NativeDataServiceSeriesConfiguration;
+
 export interface JsonApiDataSourceOptions extends DataSourceJsonData {
   queryParams?: string;
+  requestTypes?: RequestType[];
 }

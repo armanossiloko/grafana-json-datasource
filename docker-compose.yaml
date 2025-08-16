@@ -2,7 +2,7 @@ version: '3.0'
 
 services:
   grafana:
-    container_name: 'marcusolsson-json-datasource'
+    container_name: 'datahub-json-datasource'
     platform: "linux/amd64"
     build:
       context: ./.config
@@ -12,5 +12,28 @@ services:
     ports:
       - 3000:3000/tcp
     volumes:
-      - ./dist:/var/lib/grafana/plugins/marcusolsson-json-datasource
+      - ./dist:/var/lib/grafana/plugins/datahub-json-datasource
       - ./provisioning:/etc/grafana/provisioning
+    networks:
+      - grafana-network
+
+  mock-api:
+    image: node:18-alpine
+    container_name: mock-json-api
+    ports:
+      - "8080:8080"
+    working_dir: /app
+    volumes:
+      - ./mock-api:/app
+    command: |
+      sh -c "
+        npm init -y &&
+        npm install express cors &&
+        node server.js
+      "
+    networks:
+      - grafana-network
+
+networks:
+  grafana-network:
+    driver: bridge

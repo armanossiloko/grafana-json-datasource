@@ -71,19 +71,20 @@ describe('datasource', () => {
     }
   });
 
-  it('should throw error when method is not POST or GET', async () => {
+  it('should support all allowed HTTP methods', async () => {
     const ds = new JsonDataSource({ url: 'http://localhost:3000', jsonData: {} } as any);
 
-    const responsePUT = ds.doRequest({ method: 'PUT' } as any);
+    // Test that all supported methods work
+    const allowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
-    await expect(responsePUT).rejects.toThrowError('Invalid method PUT');
+    for (const method of allowedMethods) {
+      const response = ds.doRequest({ method, urlPath: '/test' } as any);
+      // Just check that no error is thrown for valid methods
+      await expect(response).resolves.toHaveLength(1);
+    }
 
-    const responsePATCH = ds.doRequest({ method: 'PATCH' } as any);
-
-    await expect(responsePATCH).rejects.toThrowError('Invalid method PATCH');
-
-    const responseDELETE = ds.doRequest({ method: 'DELETE' } as any);
-
-    await expect(responseDELETE).rejects.toThrowError('Invalid method DELETE');
+    // Test that unsupported methods still throw errors
+    const responseINVALID = ds.doRequest({ method: 'INVALID' } as any);
+    await expect(responseINVALID).rejects.toThrowError('Invalid method INVALID');
   });
 });

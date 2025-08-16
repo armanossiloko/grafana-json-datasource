@@ -19,16 +19,62 @@ import _ from 'lodash';
 import API from './api';
 import { detectFieldType } from './detectFieldType';
 import { parseValues } from './parseValues';
-import { JsonApiDataSourceOptions, JsonApiQuery, Pair } from './types';
+import { JsonApiDataSourceOptions, JsonApiQuery, Pair, RequestType } from './types';
 import { trackRequest } from 'tracking';
 
 export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourceOptions> {
   api: API;
+  instanceSettings: DataSourceInstanceSettings<JsonApiDataSourceOptions>;
 
   constructor(instanceSettings: DataSourceInstanceSettings<JsonApiDataSourceOptions>) {
     super(instanceSettings);
 
+    this.instanceSettings = instanceSettings;
     this.api = new API(instanceSettings.url!, instanceSettings.jsonData.queryParams || '');
+
+    // Ensure hardcoded request types are always available
+    this.instanceSettings.jsonData.requestTypes = this.getRequestTypesWithHardcoded();
+  }
+
+  private getRequestTypesWithHardcoded() {
+    const hardcodedTypes: RequestType[] = [
+      {
+        id: 'AggregateData',
+        name: 'Aggregate Data',
+        description: 'Request aggregated data with advanced series configuration',
+        basePath: '/api/data/batch',
+        httpMethod: 'POST',
+        isHardcoded: true,
+        api: 'DataService',
+      },
+      {
+        id: 'GetFilterTreeItems',
+        name: 'Get Filter Tree Items',
+        description: 'Request filter tree items using GraphQL',
+        basePath: '/graphql',
+        httpMethod: 'POST',
+        isHardcoded: true,
+        api: 'DomainService',
+      },
+      {
+        id: 'GetExperiments',
+        name: 'Get Experiments',
+        description: 'Request experiments by site external ID using GraphQL',
+        basePath: '/graphql',
+        httpMethod: 'POST',
+        isHardcoded: true,
+        api: 'DomainService',
+      },
+    ];
+
+    const customTypes = this.instanceSettings.jsonData.requestTypes || [];
+
+    // Remove any custom types that have the same ID as hardcoded ones
+    const filteredCustomTypes = customTypes.filter(
+      (type) => !hardcodedTypes.some((hardcoded) => hardcoded.id === type.id)
+    );
+
+    return [...hardcodedTypes, ...filteredCustomTypes];
   }
 
   /**
@@ -241,8 +287,20 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
       return [interpolate(key), interpolate(value)];
     };
 
-    if (query.method !== 'GET' && query.method !== 'POST') {
-      throw new Error(`Invalid method ${query.method}`);
+    const supportedMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
+    if (!supportedMethods.includes(query.method)) {
+      throw new Error(`Invalid method ${query.method}. Supported methods: ${supportedMethods.join(', ')}`);
+    }
+
+    // Use custom body if request type is selected, otherwise use the regular body
+    let requestBody = query.body || '';
+    if (query.requestType && query.customBody) {
+      requestBody = JSON.stringify(query.customBody);
+    }
+
+    // Clear body for GET requests
+    if (query.method === 'GET') {
+      requestBody = '';
     }
 
     return await this.api.cachedGet(
@@ -251,7 +309,7 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
       interpolate(query.urlPath),
       (query.params ?? []).map(interpolateKeyValue),
       (query.headers ?? []).map(interpolateKeyValue),
-      interpolate(query.body)
+      interpolate(requestBody)
     );
   }
 }

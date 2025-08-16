@@ -1,7 +1,7 @@
 apiVersion: 1
 
 datasources:
-  - name: jsonplaceholder
-    uid: jsonplaceholder
-    type: marcusolsson-json-datasource
-    url: https://jsonplaceholder.typicode.com
+  - name: DataHub
+    uid: datahub
+    type: datahub-json-datasource
+    url: http://mock-api:8080

@@ -1,13 +1,13 @@
 {
   "$schema": "https://github.com/grafana/grafana/raw/main/docs/sources/developers/plugins/plugin.schema.json",
   "type": "datasource",
-  "name": "JSON API",
-  "id": "marcusolsson-json-datasource",
+  "name": "DataHub JSON API",
+  "id": "datahub-json-datasource",
   "metrics": true,
   "logs": true,
   "annotations": true,
   "info": {
-    "description": "A data source plugin for loading JSON APIs into Grafana.",
+    "description": "DataHub JSON API data source plugin for loading JSON APIs into Grafana.",
     "author": {
       "name": "Grafana Labs",
       "url": "https://grafana.com"
@@ -20,7 +20,7 @@
     "links": [
       {
         "name": "Documentation",
-        "url": "https://grafana.com/docs/plugins/marcusolsson-json-datasource/latest/"
+        "url": ""
       },
       {
         "name": "Github",

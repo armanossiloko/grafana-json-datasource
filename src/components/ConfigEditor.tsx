@@ -32,13 +32,20 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
     });
   };
 
+  // Consider re-adding if we want to allow users to configure request types
+  // const onRequestTypesChange = (requestTypes: RequestType[]) => {
+  //   onOptionsChange({
+  //     ...options,
+  //     jsonData: {
+  //       ...options.jsonData,
+  //       requestTypes,
+  //     },
+  //   });
+  // };
+
   return (
     <>
-      <DataSourceDescription
-        dataSourceName="JSON API"
-        docsLink="https://grafana.com/docs/plugins/marcusolsson-json-datasource/latest/"
-        hasRequiredFields={false}
-      />
+      <DataSourceDescription dataSourceName="DataHub JSON API" docsLink="" hasRequiredFields={false} />
 
       <Divider />
 
@@ -70,6 +77,12 @@ export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
           />
         </Field>
       </ConfigSection>
+
+      <Divider />
+
+      {/* <ConfigSection title="Request Types" description="Configure predefined request types for your API" isCollapsible>
+        <RequestTypesEditor requestTypes={options.jsonData.requestTypes || []} onChange={onRequestTypesChange} />
+      </ConfigSection> */}
     </>
   );
 };
