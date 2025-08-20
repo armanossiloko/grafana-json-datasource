@@ -33,7 +33,12 @@ export const TabbedQueryEditor = ({ query, onChange, onRunQuery, fieldsTab, expe
   const theme = useTheme();
 
   const q = defaults(query, defaultQuery);
-  const requestTypes = datasource.instanceSettings.jsonData?.requestTypes || [];
+  const apis = datasource.instanceSettings.jsonData?.apis || [];
+  const globalRequestTypes = datasource.instanceSettings.jsonData?.requestTypes || [];
+
+  // Merge global request types with API-specific request types
+  const apiRequestTypes = apis.flatMap((api) => api.requestTypes || []);
+  const requestTypes = [...globalRequestTypes, ...apiRequestTypes];
 
   // Hide Path and Body tabs when a request type is selected
   const showPathTab = !q.requestType;

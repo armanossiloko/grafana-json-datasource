@@ -101,7 +101,7 @@ export const AggregateDataEditor: React.FC<Props> = ({ query, onChange, onRunQue
         newSeries = {
           ...baseSeries,
           $type: 'DataServiceSeriesConfiguration',
-          dataformat: 'Energy_1',
+          dataformat: 'DataFormat_1',
           selector: 'SelectorName',
           interpolation: 'None',
           aggregation: 'AVG',
@@ -200,7 +200,7 @@ export const AggregateDataEditor: React.FC<Props> = ({ query, onChange, onRunQue
                     id={`series-${index}-dataformat`}
                     value={series.dataformat}
                     onChange={(e) => updateSeries(index, 'dataformat', e.currentTarget.value)}
-                    placeholder="e.g., Energy_1"
+                    placeholder="e.g., DataFormat_1"
                   />
                 </Field>
                 <Field label="Selector">

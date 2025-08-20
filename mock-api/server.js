@@ -195,6 +195,28 @@ app.post('/graphql', (req, res) => {
   });
 });
 
-app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Mockend API server running at http://localhost:${port}`);
 });
+
+const connections = new Set();
+server.on('connection', (conn) => {
+  connections.add(conn);
+  conn.on('close', () => connections.delete(conn));
+});
+
+function gracefulShutdown(signal) {
+  console.log(`Received ${signal}, shutting down gracefully...`);
+
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    connections.forEach((conn) => conn.destroy());
+  }, 1000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

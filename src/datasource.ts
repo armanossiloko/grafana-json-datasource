@@ -17,6 +17,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { jp } from './jsonpath';
 import _ from 'lodash';
 import API from './api';
+import { MultiApiManager } from './multiApi';
 import { detectFieldType } from './detectFieldType';
 import { parseValues } from './parseValues';
 import { JsonApiDataSourceOptions, JsonApiQuery, Pair, RequestType } from './types';
@@ -24,6 +25,7 @@ import { trackRequest } from 'tracking';
 
 export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourceOptions> {
   api: API;
+  multiApiManager: MultiApiManager;
   instanceSettings: DataSourceInstanceSettings<JsonApiDataSourceOptions>;
 
   constructor(instanceSettings: DataSourceInstanceSettings<JsonApiDataSourceOptions>) {
@@ -31,6 +33,10 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
 
     this.instanceSettings = instanceSettings;
     this.api = new API(instanceSettings.url!, instanceSettings.jsonData.queryParams || '');
+
+    // Initialize MultiApiManager for handling different API URLs
+    const apis = instanceSettings.jsonData.apis || [];
+    this.multiApiManager = new MultiApiManager(apis);
 
     // Ensure hardcoded request types are always available
     this.instanceSettings.jsonData.requestTypes = this.getRequestTypesWithHardcoded();
@@ -45,7 +51,7 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
         basePath: '/api/data/batch',
         httpMethod: 'POST',
         isHardcoded: true,
-        api: 'DataService',
+        apiId: 'DataService',
       },
       {
         id: 'GetFilterTreeItems',
@@ -54,7 +60,7 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
         basePath: '/graphql',
         httpMethod: 'POST',
         isHardcoded: true,
-        api: 'DomainService',
+        apiId: 'DomainService',
       },
       {
         id: 'GetExperiments',
@@ -63,7 +69,7 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
         basePath: '/graphql',
         httpMethod: 'POST',
         isHardcoded: true,
-        api: 'DomainService',
+        apiId: 'DomainService',
       },
     ];
 
@@ -130,47 +136,106 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
   annotations = {};
 
   /**
-   * Checks whether we can connect to the API.
+   * Checks whether we can connect to the APIs.
    */
   async testDatasource() {
     const defaultErrorMessage = 'Cannot connect to API';
+    const apiConfigs = this.instanceSettings.jsonData.apis || [];
 
-    try {
-      const response = await this.api.test();
+    // If no APIs are configured, fall back to legacy test
+    if (apiConfigs.length === 0) {
+      try {
+        const response = await this.api.test();
 
-      if (response.status === 200) {
-        return {
-          status: 'success',
-          message: 'Success',
-        };
-      } else {
-        const message = response.statusText ? response.statusText : defaultErrorMessage;
-        return Promise.reject({
-          status: 'error',
-          message,
-          error: new HealthCheckError(message, {}),
-        });
-      }
-    } catch (err: any) {
-      if (_.isString(err)) {
-        return Promise.reject({
-          status: 'error',
-          message: err,
-          error: new HealthCheckError(err, {}),
-        });
-      } else {
-        let message = 'JSON API: ';
-        message += err.statusText ? err.statusText : defaultErrorMessage;
-        if (err.data && err.data.error && err.data.error.code) {
-          message += ': ' + err.data.error.code + '. ' + err.data.error.message;
+        if (response.status === 200) {
+          return {
+            status: 'success',
+            message: 'Success',
+          };
+        } else {
+          const message = response.statusText ? response.statusText : defaultErrorMessage;
+          return Promise.reject({
+            status: 'error',
+            message,
+            error: new HealthCheckError(message, {}),
+          });
         }
+      } catch (err: any) {
+        if (_.isString(err)) {
+          return Promise.reject({
+            status: 'error',
+            message: err,
+            error: new HealthCheckError(err, {}),
+          });
+        } else {
+          let message = 'JSON API: ';
+          message += err.statusText ? err.statusText : defaultErrorMessage;
+          if (err.data && err.data.error && err.data.error.code) {
+            message += ': ' + err.data.error.code + '. ' + err.data.error.message;
+          }
 
-        return Promise.reject({
-          status: 'error',
-          message,
-          error: new HealthCheckError(message, {}),
-        });
+          return Promise.reject({
+            status: 'error',
+            message,
+            error: new HealthCheckError(message, {}),
+          });
+        }
       }
+    }
+
+    // Test all configured APIs
+    const testResults = await Promise.allSettled(
+      apiConfigs.map(async (apiConfig) => {
+        try {
+          const response = await this.multiApiManager.test(apiConfig.id);
+          return {
+            apiId: apiConfig.id,
+            apiName: apiConfig.name,
+            status: response.status === 200 ? 'success' : 'error',
+            message: response.status === 200 ? 'Success' : response.statusText || defaultErrorMessage,
+          };
+        } catch (err: any) {
+          return {
+            apiId: apiConfig.id,
+            apiName: apiConfig.name,
+            status: 'error',
+            message: err.message || defaultErrorMessage,
+          };
+        }
+      })
+    );
+
+    const results = testResults.map((result) =>
+      result.status === 'fulfilled'
+        ? result.value
+        : {
+            apiId: 'unknown',
+            apiName: 'unknown',
+            status: 'error',
+            message: 'Test failed',
+          }
+    );
+
+    const failedTests = results.filter((result) => result.status === 'error');
+    const successfulTests = results.filter((result) => result.status === 'success');
+
+    if (failedTests.length === 0) {
+      return {
+        status: 'success',
+        message: `All APIs connected successfully: ${successfulTests.map((r) => r.apiName).join(', ')}`,
+      };
+    } else if (successfulTests.length > 0) {
+      return {
+        status: 'success',
+        message: `Some APIs connected successfully: ${successfulTests.map((r) => r.apiName).join(', ')}. Failed: ${failedTests.map((r) => `${r.apiName} (${r.message})`).join(', ')}`,
+      };
+    } else {
+      const errorMessage = `All API connections failed: ${failedTests.map((r) => `${r.apiName} (${r.message})`).join(', ')}`;
+      return Promise.reject({
+        status: 'error',
+        message: errorMessage,
+        error: new HealthCheckError(errorMessage, {}),
+      });
     }
   }
 
@@ -292,6 +357,17 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
       throw new Error(`Invalid method ${query.method}. Supported methods: ${supportedMethods.join(', ')}`);
     }
 
+    // Determine which API to use
+    let apiId = query.apiId;
+
+    // If no API is specified but a request type is selected, try to find the API from the request type
+    if (!apiId && query.requestType) {
+      const requestType = this.instanceSettings.jsonData.requestTypes?.find((rt) => rt.id === query.requestType);
+      if (requestType && requestType.apiId) {
+        apiId = requestType.apiId;
+      }
+    }
+
     // Use custom body if request type is selected, otherwise use the regular body
     let requestBody = query.body || '';
     if (query.requestType && query.customBody) {
@@ -303,6 +379,20 @@ export class JsonDataSource extends DataSourceApi<JsonApiQuery, JsonApiDataSourc
       requestBody = '';
     }
 
+    // Use MultiApiManager if we have APIs configured and an API is selected
+    if (apiId && this.multiApiManager.getAllApis().length > 0) {
+      return await this.multiApiManager.cachedGet(
+        apiId,
+        query.cacheDurationSeconds,
+        query.method,
+        interpolate(query.urlPath),
+        (query.params ?? []).map(interpolateKeyValue),
+        (query.headers ?? []).map(interpolateKeyValue),
+        interpolate(requestBody)
+      );
+    }
+
+    // Fall back to legacy API if no API is selected or no multi-API configuration is available
     return await this.api.cachedGet(
       query.cacheDurationSeconds,
       query.method,

@@ -5,3 +5,51 @@ datasources:
     uid: datahub
     type: datahub-json-datasource
     url: http://mock-api:8080
+    editable: true
+    jsonData:
+      apis:
+        - id: DomainService
+          name: Domain Service API
+          url: http://localhost:8080
+          queryParams: ""
+          headers:
+            - ["Authorization", "Bearer domain-service-token"]
+            - ["Content-Type", "application/json"]
+            - ["X-API-Version", "v1"]
+            - ["X-Service", "DomainService"]
+          requestTypes:
+            - id: GetDomains
+              name: Get All Domains
+              description: Retrieve all available domains
+              basePath: /domains
+              httpMethod: GET
+              apiId: DomainService
+        - id: DataService
+          name: Data Service API
+          url: http://localhost:8080
+          queryParams: ""
+          headers:
+            - ["Authorization", "Bearer data-service-token"]
+            - ["Content-Type", "application/json"]
+            - ["X-API-Version", "v1"]
+            - ["X-Service", "DataService"]
+          requestTypes:
+            - id: PostData
+              name: Post Data
+              description: Submit new data points
+              basePath: /data
+              httpMethod: POST
+              apiId: DataService
+              defaultBody:
+                data:
+                  - timestamp: "2025-01-01T00:00:00Z"
+                    value: 123.45
+                    source: "sensor-001"
+                  - timestamp: "2025-01-01T01:00:00Z"
+                    value: 67.89
+                    source: "sensor-002"
+                metadata:
+                  collection: "temperature_readings"
+                  quality: "high"
+                  tags: ["production", "api"]
+

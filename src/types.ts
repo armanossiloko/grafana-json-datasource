@@ -26,6 +26,9 @@ export interface JsonApiQuery extends DataQuery {
   requestType?: string;
   customBody?: Record<string, any>;
 
+  // API selection for multi-API support
+  apiId?: string;
+
   // Keep for backwards compatibility with older version of variables query editor.
   jsonPath?: string;
 
@@ -44,6 +47,17 @@ export const defaultQuery: Partial<JsonApiQuery> = {
   fields: [{ jsonPath: '' }],
 };
 
+export interface ApiConfiguration {
+  id: string;
+  name: string;
+  url: string; // Full URL for this API
+  queryParams?: string;
+  // Headers can be configured per API
+  headers?: Array<Pair<string, string>>;
+  // Request types specific to this API
+  requestTypes?: RequestType[];
+}
+
 export interface RequestType {
   id: string;
   name: string;
@@ -52,7 +66,8 @@ export interface RequestType {
   httpMethod: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   defaultFields?: JsonField[];
   isHardcoded?: boolean;
-  api?: 'DomainService' | 'DataService';
+  apiId?: string; // Changed from api to apiId to reference the API configuration
+  defaultBody?: Record<string, any>;
 }
 
 export interface SeriesConfiguration {
@@ -95,4 +110,8 @@ export type AnySeriesConfiguration =
 export interface JsonApiDataSourceOptions extends DataSourceJsonData {
   queryParams?: string;
   requestTypes?: RequestType[];
+  // New multi-API configuration
+  apis?: ApiConfiguration[];
+  // Keep legacy fields for backward compatibility
+  legacyMode?: boolean;
 }

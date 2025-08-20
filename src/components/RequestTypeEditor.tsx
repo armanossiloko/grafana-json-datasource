@@ -16,12 +16,12 @@ interface Props {
 export const RequestTypeEditor: React.FC<Props> = ({ query, onChange, onRunQuery, requestTypes }) => {
   const styles = useStyles2(getStyles);
   const [jsonBody, setJsonBody] = useState<string>('{}');
-  const [selectedApi, setSelectedApi] = useState<string>('');
+  const selectedApi = query.apiId || '';
 
   // Group request types by API
   const requestTypesByApi = requestTypes.reduce(
     (acc, rt) => {
-      const api = rt.api || 'Other';
+      const api = rt.apiId || 'Other';
       if (!acc[api]) {
         acc[api] = [];
       }
@@ -53,13 +53,13 @@ export const RequestTypeEditor: React.FC<Props> = ({ query, onChange, onRunQuery
 
   // Set the selected API based on the current request type (for backward compatibility)
   useEffect(() => {
-    if (query.requestType && !selectedApi) {
+    if (query.requestType && !query.apiId) {
       const currentRequestType = requestTypes.find((rt) => rt.id === query.requestType);
-      if (currentRequestType?.api) {
-        setSelectedApi(currentRequestType.api);
+      if (currentRequestType?.apiId) {
+        onChange({ ...query, apiId: currentRequestType.apiId });
       }
     }
-  }, [query.requestType, requestTypes, selectedApi]);
+  }, [query, requestTypes, onChange]);
 
   const requestTypeOptions: Array<SelectableValue<string>> = [
     { label: 'Select a request type...', value: '' },
@@ -71,19 +71,29 @@ export const RequestTypeEditor: React.FC<Props> = ({ query, onChange, onRunQuery
   ];
 
   const onApiChange = (selected: SelectableValue<string>) => {
-    setSelectedApi(selected.value || '');
-    // Clear the request type when API changes
+    const newApiId = selected.value || '';
+    // Only clear request type if it doesn't belong to the new API
     if (query.requestType) {
-      const newQuery = {
-        ...query,
-        requestType: '',
-        method: 'GET',
-        urlPath: '',
-        customBody: undefined,
-        body: '',
-      };
-      onChange(newQuery);
-      setJsonBody('{}');
+      const currentRequestType = requestTypes.find((rt) => rt.id === query.requestType);
+      if (!currentRequestType || currentRequestType.apiId !== newApiId) {
+        const newQuery = {
+          ...query,
+          apiId: newApiId,
+          requestType: '',
+          method: 'GET',
+          urlPath: '',
+          customBody: undefined,
+          body: '',
+        };
+        onChange(newQuery);
+        setJsonBody('{}');
+      } else {
+        // Just update the API ID without clearing other fields
+        onChange({ ...query, apiId: newApiId });
+      }
+    } else {
+      // Just update the API ID
+      onChange({ ...query, apiId: newApiId });
     }
   };
 
@@ -97,14 +107,14 @@ export const RequestTypeEditor: React.FC<Props> = ({ query, onChange, onRunQuery
       urlPath: selectedRequestType?.basePath || '', // Set the path from request type
     };
 
-    // Clear body for GET requests, initialize with example for others
+    // Clear body for GET requests, use defaultBody for others
     if (selectedRequestType?.httpMethod === 'GET') {
       // Clear body for GET requests
       newQuery.customBody = undefined;
       newQuery.body = '';
       setJsonBody('');
     } else {
-      // Initialize with example body if it's AggregateData or other POST/PUT/etc requests
+      // Handle hardcoded request types with special JSON bodies
       if (selected.value === 'AggregateData') {
         const exampleBody = {
           aggregationType: 'sum',
@@ -134,8 +144,12 @@ export const RequestTypeEditor: React.FC<Props> = ({ query, onChange, onRunQuery
         };
         newQuery.customBody = exampleBody;
         setJsonBody(JSON.stringify(exampleBody, null, 2));
+      } else if (selectedRequestType?.defaultBody) {
+        // Handle YAML-defined request types with defaultBody
+        newQuery.customBody = selectedRequestType.defaultBody;
+        setJsonBody(JSON.stringify(selectedRequestType.defaultBody, null, 2));
       } else {
-        // Initialize with empty object for other non-GET requests
+        // Initialize with empty object for non-predefined requests
         newQuery.customBody = {};
         setJsonBody('{}');
       }
@@ -147,19 +161,7 @@ export const RequestTypeEditor: React.FC<Props> = ({ query, onChange, onRunQuery
 
   const onJsonBodyChange = (value: string) => {
     setJsonBody(value);
-
-    try {
-      const parsedBody = JSON.parse(value);
-      const newQuery = {
-        ...query,
-        customBody: parsedBody,
-        body: value, // Also update the original body field for backward compatibility
-      };
-      onChange(newQuery);
-    } catch (error) {
-      // Invalid JSON - don't update the query yet
-      console.warn('Invalid JSON:', error);
-    }
+    // Only update local state, don't trigger query updates on every keystroke
   };
 
   const onJsonBodyBlur = () => {
@@ -205,7 +207,6 @@ export const RequestTypeEditor: React.FC<Props> = ({ query, onChange, onRunQuery
             aria-label="Request Type"
             inputId="requestType"
             menuPortalTarget={document.body}
-            isDisabled={!selectedApi}
           />
         </InlineField>
       </InlineFieldRow>
@@ -244,7 +245,7 @@ export const RequestTypeEditor: React.FC<Props> = ({ query, onChange, onRunQuery
       {selectedRequestType && (
         <div className={styles.infoSection}>
           <div className={styles.pathInfo}>
-            <strong>API:</strong> {selectedRequestType.api || 'Not specified'} | <strong>Endpoint:</strong>{' '}
+            <strong>API:</strong> {selectedRequestType.apiId || 'Not specified'} | <strong>Endpoint:</strong>{' '}
             <code>
               {selectedRequestType.httpMethod} {selectedRequestType.basePath}
             </code>

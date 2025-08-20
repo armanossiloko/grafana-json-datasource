@@ -1,17 +1,8 @@
-import { DataSourcePluginOptionsEditorProps, GrafanaTheme2 } from '@grafana/data';
-import { Field, Input, useStyles2 } from '@grafana/ui';
-import React, { ChangeEvent } from 'react';
-import { JsonApiDataSourceOptions } from '../types';
-import {
-  AdvancedHttpSettings,
-  Auth,
-  ConfigSection,
-  ConnectionSettings,
-  DataSourceDescription,
-  convertLegacyAuthProps,
-} from '@grafana/experimental';
-import { css } from '@emotion/css';
-import { Divider } from './Divider';
+import { DataSourcePluginOptionsEditorProps } from '@grafana/data';
+import React, { useEffect } from 'react';
+import { JsonApiDataSourceOptions, ApiConfiguration } from '../types';
+import { ConfigSection, DataSourceDescription } from '@grafana/experimental';
+import { ApiConfigurationEditor } from './ApiConfigurationEditor';
 
 type Props = DataSourcePluginOptionsEditorProps<JsonApiDataSourceOptions>;
 
@@ -20,78 +11,41 @@ type Props = DataSourcePluginOptionsEditorProps<JsonApiDataSourceOptions>;
  * authentication.
  */
 export const ConfigEditor: React.FC<Props> = ({ options, onOptionsChange }) => {
-  const styles = useStyles2(getStyles);
+  // Initialize with predefined APIs if not already set
+  useEffect(() => {
+    if (!options.jsonData.apis || options.jsonData.apis.length === 0) {
+      onOptionsChange({
+        ...options,
+        jsonData: {
+          ...options.jsonData,
+          apis: [],
+        },
+      });
+    }
+  }, [options, onOptionsChange]);
 
-  const onParamsChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const onApisChange = (apis: ApiConfiguration[]) => {
     onOptionsChange({
       ...options,
       jsonData: {
         ...options.jsonData,
-        queryParams: e.currentTarget.value,
+        apis,
       },
     });
   };
-
-  // Consider re-adding if we want to allow users to configure request types
-  // const onRequestTypesChange = (requestTypes: RequestType[]) => {
-  //   onOptionsChange({
-  //     ...options,
-  //     jsonData: {
-  //       ...options.jsonData,
-  //       requestTypes,
-  //     },
-  //   });
-  // };
 
   return (
     <>
       <DataSourceDescription dataSourceName="DataHub JSON API" docsLink="" hasRequiredFields={false} />
 
-      <Divider />
-
-      <ConnectionSettings config={options} onChange={onOptionsChange} urlPlaceholder="http://localhost:8080" />
-
-      <Divider />
-
-      <Auth
-        {...convertLegacyAuthProps({
-          config: options,
-          onChange: onOptionsChange,
-        })}
-      />
-
-      <Divider />
-
-      <ConfigSection title="Additional settings" isCollapsible>
-        <AdvancedHttpSettings config={options} onChange={onOptionsChange} />
-
-        <div className={styles.space} />
-
-        <Field label="Query string" description="Add a custom query string to your queries.">
-          <Input
-            width={40}
-            value={options.jsonData.queryParams}
-            onChange={onParamsChange}
-            spellCheck={false}
-            placeholder="limit=100"
-          />
-        </Field>
+      <ConfigSection
+        title="API Configurations"
+        description="Configure multiple APIs with their own URL, authentication, headers, and request types"
+        isCollapsible
+      >
+        <ApiConfigurationEditor apis={options.jsonData.apis || []} onChange={onApisChange} />
       </ConfigSection>
-
-      <Divider />
-
-      {/* <ConfigSection title="Request Types" description="Configure predefined request types for your API" isCollapsible>
-        <RequestTypesEditor requestTypes={options.jsonData.requestTypes || []} onChange={onRequestTypesChange} />
-      </ConfigSection> */}
     </>
   );
 };
 
-const getStyles = (theme: GrafanaTheme2) => {
-  return {
-    space: css({
-      width: '100%',
-      height: theme.spacing(2),
-    }),
-  };
-};

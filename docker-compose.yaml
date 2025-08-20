@@ -25,12 +25,8 @@ services:
     working_dir: /app
     volumes:
       - ./mock-api:/app
-    command: |
-      sh -c "
-        npm init -y &&
-        npm install express cors &&
-        node server.js
-      "
+    command: node server.js
+    stop_grace_period: 3s
     networks:
       - grafana-network
 
